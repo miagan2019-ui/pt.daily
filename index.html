@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>每日康复练习</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --ink:#1f2933; --sub:#7b8794;
+    --accent:#3a8fd6; --accent-d:#2f73ad; --done:#43b97f; --line:#e4e8ee;
+    --shadow:0 2px 10px rgba(30,50,80,.07);
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); padding:16px 14px 60px; max-width:560px; margin:0 auto;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{ margin-bottom:14px; }
+  .date{ font-size:13px; color:var(--sub); }
+  h1{ font-size:22px; font-weight:700; margin-top:2px; }
+
+  /* progress */
+  .progress-wrap{ background:var(--card); border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .progress-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .progress-label{ font-size:14px; color:var(--sub); }
+  .progress-count{ font-size:15px; font-weight:600; }
+  .bar{ height:12px; background:#e9eef4; border-radius:99px; overflow:hidden; }
+  .bar-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--done)); border-radius:99px; transition:width .4s ease; }
+  .all-done{ text-align:center; color:var(--done); font-weight:600; font-size:15px; margin-top:12px; display:none; }
+
+  /* exercise card */
+  .ex{ background:var(--card); border-radius:16px; box-shadow:var(--shadow); margin-bottom:14px; overflow:hidden; transition:opacity .3s; }
+  .ex.done{ opacity:.62; }
+  .ex-head{ display:flex; align-items:center; padding:16px; gap:14px; cursor:pointer; }
+  .check{
+    flex:0 0 30px; width:30px; height:30px; border-radius:50%; border:2px solid var(--line);
+    display:flex; align-items:center; justify-content:center; transition:all .2s; background:#fff;
+  }
+  .ex.done .check{ background:var(--done); border-color:var(--done); }
+  .check svg{ width:16px; height:16px; opacity:0; transition:opacity .2s; }
+  .ex.done .check svg{ opacity:1; }
+  .ex-info{ flex:1; min-width:0; }
+  .ex-name{ font-size:17px; font-weight:600; }
+  .ex.done .ex-name{ text-decoration:line-through; color:var(--sub); }
+  .ex-meta{ font-size:13px; color:var(--sub); margin-top:2px; }
+  .chev{ flex:0 0 auto; color:var(--sub); transition:transform .25s; }
+  .ex.open .chev{ transform:rotate(180deg); }
+
+  .ex-body{ max-height:0; overflow:hidden; transition:max-height .3s ease; }
+  .ex.open .ex-body{ max-height:600px; }
+  .ex-body-inner{ padding:0 16px 16px; border-top:1px solid var(--line); margin-top:0; }
+  .ex-desc{ font-size:14px; line-height:1.6; color:#52606d; padding-top:14px; }
+
+  /* counter / timer tools */
+  .tools{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .tool{ flex:1; min-width:130px; background:#f5f8fb; border-radius:12px; padding:12px; text-align:center; }
+  .tool-label{ font-size:12px; color:var(--sub); margin-bottom:8px; }
+  .counter-row{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  .cbtn{ width:38px; height:38px; border-radius:50%; border:none; background:var(--accent); color:#fff; font-size:22px; font-weight:600; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .cbtn:active{ background:var(--accent-d); }
+  .cval{ font-size:22px; font-weight:700; min-width:54px; }
+  .cval small{ font-size:13px; color:var(--sub); font-weight:500; }
+
+  .timer-val{ font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; margin-bottom:8px; }
+  .tbtns{ display:flex; gap:8px; justify-content:center; }
+  .tbtn{ padding:7px 16px; border-radius:9px; border:none; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:#fff; }
+  .tbtn.ghost{ background:#e4ebf2; color:var(--ink); }
+  .tbtn:active{ opacity:.8; }
+
+  .done-btn{ width:100%; margin-top:14px; padding:13px; border-radius:12px; border:none; background:var(--done); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+  .ex.done .done-btn{ background:#e4ebf2; color:var(--sub); }
+
+  footer{ text-align:center; font-size:12px; color:var(--sub); margin-top:24px; }
+  .reset{ background:none; border:none; color:var(--accent); font-size:13px; cursor:pointer; text-decoration:underline; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="date" id="today"></div>
+  <h1>今日康复练习 🧘</h1>
+</header>
+
+<div class="progress-wrap">
+  <div class="progress-top">
+    <span class="progress-label">完成进度</span>
+    <span class="progress-count" id="pcount">0 / 4</span>
+  </div>
+  <div class="bar"><div class="bar-fill" id="pfill"></div></div>
+  <div class="all-done" id="alldone">🎉 太棒了，今天全部完成！</div>
+</div>
+
+<div id="list"></div>
+
+<footer>
+  跟着你的物理治疗师安排，慢慢来 💙<br>
+  <button class="reset" id="resetBtn">重置今天的打卡</button>
+</footer>
+
+<script>
+const exercises = [
+  { id:'birddog', name:'Bird Dog', sets:2, reps:10, type:'reps',
+    desc:'四点跪姿（手在肩下、膝在髋下）。收紧核心，同时伸出对侧的手臂和腿，保持身体稳定不晃动，背部成一条直线。停顿 1–2 秒后收回，换边。' },
+  { id:'happybaby', name:'Happy Baby', sets:1, reps:3, type:'hold',
+    desc:'仰卧，双膝弯向胸口，双手抓住脚的外侧或脚踝，轻轻将膝盖往腋下方向拉，放松下背和髋部。每次保持 20–30 秒，深呼吸。' },
+  { id:'breathing', name:'Diaphragmatic Breathing（腹式呼吸）', sets:2, reps:10, type:'reps',
+    desc:'仰卧或坐姿，一只手放胸口一只手放肚子。用鼻子慢慢吸气，让肚子鼓起（胸口尽量不动），再缓缓用嘴呼气让肚子回落。每一次完整吸呼算一下。' },
+  { id:'childpose', name:"Child's Pose Side Stretch（婴儿式侧拉伸）", sets:1, reps:3, type:'hold',
+    desc:'跪坐后臀部坐向脚跟，双手向前伸展趴下成婴儿式。然后双手一起慢慢移向左侧，感受右侧身体的拉伸，保持 20–30 秒，再换另一侧。' },
+];
+
+const todayKey = new Date().toISOString().slice(0,10);
+const STORE = 'ptDaily';
+
+function load(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(STORE)||'{}');
+    if(raw.date === todayKey) return raw.done || {};
+  }catch(e){}
+  return {};
+}
+function save(done){
+  localStorage.setItem(STORE, JSON.stringify({date:todayKey, done}));
+}
+let doneState = load();
+
+// date label
+const d = new Date();
+const wd = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+document.getElementById('today').textContent =
+  `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · ${wd}`;
+
+const list = document.getElementById('list');
+
+exercises.forEach(ex=>{
+  const card = document.createElement('div');
+  card.className = 'ex' + (doneState[ex.id] ? ' done':'');
+  card.id = 'card-'+ex.id;
+  const metaText = `${ex.sets} 组 × ${ex.reps} ${ex.type==='reps'?'次':'次保持'}`;
+
+  let toolsHTML = '';
+  if(ex.type==='reps'){
+    toolsHTML = `
+      <div class="tool">
+        <div class="tool-label">次数计数</div>
+        <div class="counter-row">
+          <button class="cbtn" data-act="dec">–</button>
+          <div class="cval"><span class="rc">0</span><small>/${ex.reps}</small></div>
+          <button class="cbtn" data-act="inc">+</button>
+        </div>
+      </div>
+      <div class="tool">
+        <div class="tool-label">组数</div>
+        <div class="counter-row">
+          <button class="cbtn" data-act="sdec">–</button>
+          <div class="cval"><span class="sc">0</span><small>/${ex.sets}</small></div>
+          <button class="cbtn" data-act="sinc">+</button>
+        </div>
+      </div>`;
+  } else {
+    toolsHTML = `
+      <div class="tool" style="flex-basis:100%">
+        <div class="tool-label">保持计时</div>
+        <div class="timer-val tv">00:30</div>
+        <div class="tbtns">
+          <button class="tbtn" data-act="tstart">开始</button>
+          <button class="tbtn ghost" data-act="treset">重置</button>
+        </div>
+      </div>`;
+  }
+
+  card.innerHTML = `
+    <div class="ex-head" data-toggle>
+      <div class="check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="ex-info">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-meta">${metaText}</div>
+      </div>
+      <div class="chev"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="ex-body">
+      <div class="ex-body-inner">
+        <div class="ex-desc">${ex.desc}</div>
+        <div class="tools">${toolsHTML}</div>
+        <button class="done-btn" data-done>${doneState[ex.id]?'已完成 ✓ 点击取消':'标记为完成'}</button>
+      </div>
+    </div>`;
+
+  list.appendChild(card);
+
+  // toggle expand
+  card.querySelector('[data-toggle]').addEventListener('click', ()=>{
+    card.classList.toggle('open');
+  });
+
+  // done button
+  card.querySelector('[data-done]').addEventListener('click', e=>{
+    e.stopPropagation();
+    doneState[ex.id] = !doneState[ex.id];
+    card.classList.toggle('done', doneState[ex.id]);
+    e.target.textContent = doneState[ex.id] ? '已完成 ✓ 点击取消' : '标记为完成';
+    save(doneState); updateProgress();
+  });
+
+  // reps counter
+  if(ex.type==='reps'){
+    let r=0, s=0;
+    const rc = card.querySelector('.rc'), sc = card.querySelector('.sc');
+    card.querySelectorAll('.cbtn').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        const a = btn.dataset.act;
+        if(a==='inc'){ r++; if(r>ex.reps){ r=0; if(s<ex.sets){ s++; sc.textContent=s; } } }
+        if(a==='dec') r=Math.max(0,r-1);
+        if(a==='sinc') s=Math.min(ex.sets,s+1);
+        if(a==='sdec') s=Math.max(0,s-1);
+        rc.textContent=r; sc.textContent=s;
+      });
+    });
+  } else {
+    // timer
+    let secs=30, timerId=null;
+    const tv = card.querySelector('.tv');
+    const fmt = x => `00:${String(x).padStart(2,'0')}`;
+    card.querySelectorAll('.tbtn').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        const a = btn.dataset.act;
+        if(a==='tstart'){
+          if(timerId){ clearInterval(timerId); timerId=null; btn.textContent='开始'; return; }
+          btn.textContent='暂停';
+          timerId=setInterval(()=>{
+            secs--; tv.textContent=fmt(Math.max(0,secs));
+            if(secs<=0){ clearInterval(timerId); timerId=null; btn.textContent='开始'; secs=30;
+              tv.textContent='完成 ✓'; if(navigator.vibrate) navigator.vibrate(200);
+              setTimeout(()=>tv.textContent=fmt(30),1500); }
+          },1000);
+        }
+        if(a==='treset'){ clearInterval(timerId); timerId=null; secs=30; tv.textContent=fmt(30);
+          card.querySelector('[data-act="tstart"]').textContent='开始'; }
+      });
+    });
+  }
+});
+
+function updateProgress(){
+  const total = exercises.length;
+  const done = exercises.filter(e=>doneState[e.id]).length;
+  document.getElementById('pcount').textContent = `${done} / ${total}`;
+  document.getElementById('pfill').style.width = (done/total*100)+'%';
+  document.getElementById('alldone').style.display = done===total ? 'block':'none';
+}
+updateProgress();
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('确定重置今天所有打卡？')){
+    doneState={}; save(doneState);
+    document.querySelectorAll('.ex').forEach(c=>c.classList.remove('done'));
+    document.querySelectorAll('[data-done]').forEach(b=>b.textContent='标记为完成');
+    updateProgress();
+  }
+});
+</script>
+</body>
+</html>
