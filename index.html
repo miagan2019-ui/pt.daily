@@ -97,6 +97,13 @@
   .sbtn:active{ background:var(--accent-d); }
   .plan-actions{ text-align:center; margin-top:6px; }
   .plan-note{ font-size:12px; color:var(--sub); text-align:center; margin-bottom:14px; }
+  .plan-row.off{ opacity:.5; }
+  .ptoggle{ flex:0 0 auto; border:none; border-radius:999px; padding:7px 11px; font-size:12px; font-weight:700; cursor:pointer; }
+  .ptoggle.on{ background:#e3f3ea; color:var(--done); }
+  .ptoggle:not(.on){ background:#f0e3e3; color:#b4565a; }
+  .pdrag{ flex:0 0 auto; color:#c2ccd6; cursor:grab; touch-action:none; padding:2px; display:flex; align-items:center; }
+  .sortable-ghost{ opacity:.35; }
+  .sortable-chosen{ box-shadow:0 6px 18px rgba(30,50,80,.18); }
 
   /* progress page */
   .stats{ display:flex; gap:10px; margin-bottom:16px; }
@@ -133,6 +140,10 @@
   .g-pose{ width:80%; max-width:300px; margin-bottom:18px; }
   .g-count{ font-size:64px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; line-height:1; min-height:64px; }
   .g-set{ font-size:15px; color:var(--sub); margin-top:6px; margin-bottom:22px; }
+  .g-prog{ width:80%; max-width:300px; height:8px; background:#e3e9f0; border-radius:99px; overflow:hidden; margin-bottom:18px; }
+  .g-prog-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--done)); border-radius:99px; transition:width .4s ease; }
+  .g-pace{ width:70%; max-width:260px; height:10px; background:#e3e9f0; border-radius:99px; overflow:hidden; margin:2px 0 18px; }
+  .g-pace-fill{ height:100%; width:0; background:var(--accent); border-radius:99px; }
   .g-btns{ display:flex; gap:12px; }
   .g-btns button{ padding:12px 18px; border-radius:12px; border:none; font-size:15px; font-weight:700; cursor:pointer; }
   .g-pause{ background:var(--accent); color:#fff; }
@@ -167,7 +178,7 @@
 
 <!-- 计划 -->
 <div class="view" id="view-plan">
-  <div class="plan-note">用 ▲▼ 调整顺序，用 + / − 改每个动作的组数和次数。改动会自动保存。</div>
+  <div class="plan-note">用 ▲▼ 调整顺序，+/− 改组数次数，右侧按钮选择今天是否练这个动作。改动自动保存。</div>
   <div class="plan-note" id="planTotal" style="margin-top:-8px;font-weight:700;color:var(--accent-d)"></div>
   <div id="planList"></div>
   <div class="plan-actions"><button class="reset" id="planReset">恢复默认计划</button></div>
@@ -202,10 +213,12 @@
 
 <div class="overlay" id="overlay">
   <div class="g-step" id="gStep"></div>
+  <div class="g-prog"><div class="g-prog-fill" id="gProgFill"></div></div>
   <div class="g-name" id="gName"></div>
   <div class="g-sub" id="gSub"></div>
   <div class="g-pose" id="gPose"></div>
   <div class="g-count" id="gCount"></div>
+  <div class="g-pace"><div class="g-pace-fill" id="gPaceFill"></div></div>
   <div class="g-set" id="gSet"></div>
   <div class="g-btns">
     <button class="g-pause" id="gPause">暂停</button>
@@ -214,9 +227,10 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script>
 const BASE = [
-  { id:'birddog', name:'Bird Dog', sets:2, reps:10, type:'reps', repSecs:3,
+  { id:'birddog', name:'Bird Dog', sets:2, reps:10, type:'reps', repSecs:5,
     cue:'伸出对侧手脚，背部保持平直。',
     desc:'四点跪姿（手在肩下、膝在髋下）。收紧核心，同时伸出对侧的手臂和腿，保持身体稳定不晃动，背部成一条直线。停顿 1–2 秒后收回，换边。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><line x1="68" y1="50" x2="106" y2="50"/><circle cx="116" cy="48" r="7"/><line x1="106" y1="50" x2="106" y2="84"/><line x1="68" y1="50" x2="58" y2="84"/><line x1="106" y1="50" x2="142" y2="34"/><line x1="68" y1="50" x2="34" y2="36"/></svg>` },
@@ -224,7 +238,7 @@ const BASE = [
     cue:'抓住双脚，轻轻把膝盖拉向腋下。',
     desc:'仰卧，双膝弯向胸口，双手抓住脚的外侧或脚踝，轻轻将膝盖往腋下方向拉，放松下背和髋部。每次保持 20–30 秒，深呼吸。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><circle cx="34" cy="76" r="7"/><line x1="42" y1="78" x2="80" y2="74"/><line x1="80" y1="74" x2="96" y2="44"/><line x1="96" y1="44" x2="86" y2="34"/><line x1="80" y1="74" x2="70" y2="46"/><line x1="70" y1="46" x2="62" y2="36"/><line x1="56" y1="76" x2="86" y2="36"/></svg>` },
-  { id:'breathing', name:'Diaphragmatic Breathing（腹式呼吸）', sets:2, reps:10, type:'reps', repSecs:5,
+  { id:'breathing', name:'Diaphragmatic Breathing（腹式呼吸）', sets:2, reps:10, type:'reps', repSecs:6,
     cue:'鼻子吸气让肚子鼓起，嘴巴慢慢呼气。',
     desc:'仰卧或坐姿，一只手放胸口一只手放肚子。用鼻子慢慢吸气，让肚子鼓起（胸口尽量不动），再缓缓用嘴呼气让肚子回落。每一次完整吸呼算一下。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><circle cx="26" cy="74" r="7"/><line x1="33" y1="78" x2="118" y2="78"/><line x1="118" y1="78" x2="132" y2="60"/><line x1="60" y1="78" x2="64" y2="64"/><line x1="92" y1="78" x2="96" y2="62"/><path d="M70 50 q14 -14 28 0"/></svg>` },
@@ -232,19 +246,19 @@ const BASE = [
     cue:'趴下后双手向一侧伸展，感受体侧拉伸。',
     desc:'跪坐后臀部坐向脚跟，双手向前伸展趴下成婴儿式。然后双手一起慢慢移向左侧，感受右侧身体的拉伸，保持 20–30 秒，再换另一侧。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><path d="M96 84 q4 -22 18 -22"/><line x1="96" y1="84" x2="96" y2="70"/><line x1="114" y1="62" x2="60" y2="74"/><line x1="60" y1="74" x2="30" y2="80"/><circle cx="50" cy="72" r="6"/></svg>` },
-  { id:'squats', name:'Squats（深蹲）', sets:2, reps:10, type:'reps', repSecs:3,
+  { id:'squats', name:'Squats（深蹲）', sets:2, reps:10, type:'reps', repSecs:4,
     cue:'臀部向后向下坐，膝盖不要内扣。',
     desc:'双脚与肩同宽、脚尖略朝外。臀部向后向下坐，像要坐到椅子上，膝盖跟脚尖同方向、不要内扣，下蹲到大腿接近与地面平行，再用脚跟发力站起。全程挺胸、收紧核心。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="92" x2="152" y2="92"/><circle cx="80" cy="22" r="8"/><line x1="80" y1="30" x2="80" y2="54"/><line x1="80" y1="54" x2="58" y2="60"/><line x1="58" y1="60" x2="62" y2="92"/><line x1="80" y1="54" x2="102" y2="60"/><line x1="102" y1="60" x2="98" y2="92"/><line x1="80" y1="38" x2="108" y2="44"/></svg>` },
-  { id:'sumosquat', name:'Sumo Squat（相扑深蹲）', sets:2, reps:10, type:'reps', repSecs:3,
+  { id:'sumosquat', name:'Sumo Squat（相扑深蹲）', sets:2, reps:10, type:'reps', repSecs:4,
     cue:'双脚宽站、脚尖朝外，膝盖顺脚尖方向打开。',
     desc:'双脚比肩略宽，脚尖明显朝外约 45°。臀部下沉做深蹲，膝盖顺着脚尖方向打开，感受大腿内侧发力，再站起、轻轻夹紧臀部。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="92" x2="152" y2="92"/><circle cx="80" cy="22" r="8"/><line x1="80" y1="30" x2="80" y2="52"/><line x1="80" y1="52" x2="50" y2="64"/><line x1="50" y1="64" x2="40" y2="92"/><line x1="80" y1="52" x2="110" y2="64"/><line x1="110" y1="64" x2="120" y2="92"/><line x1="80" y1="40" x2="58" y2="56"/><line x1="80" y1="40" x2="102" y2="56"/></svg>` },
-  { id:'clamshells', name:'Clamshells（蚌式开合）', sets:2, reps:10, type:'reps', repSecs:3,
+  { id:'clamshells', name:'Clamshells（蚌式开合）', sets:2, reps:10, type:'reps', repSecs:4,
     cue:'脚跟并拢，上面的膝盖像蚌壳一样往上打开。',
     desc:'侧躺，双膝弯曲叠放、脚跟并拢。保持骨盆稳定不后倒，像蚌壳一样把上面的膝盖向上打开，感受臀部外侧发力，再缓慢合回。做完一侧换边。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><circle cx="120" cy="58" r="7"/><line x1="114" y1="62" x2="74" y2="74"/><line x1="74" y1="74" x2="54" y2="60"/><line x1="54" y1="60" x2="40" y2="74"/><line x1="74" y1="74" x2="56" y2="80"/><line x1="56" y1="80" x2="40" y2="74"/></svg>` },
-  { id:'hipadduction', name:'Side Lying Hip Adduction（侧卧髋内收）', sets:2, reps:10, type:'reps', repSecs:3,
+  { id:'hipadduction', name:'Side Lying Hip Adduction（侧卧髋内收）', sets:2, reps:10, type:'reps', repSecs:4,
     cue:'上腿跨到前方，把下面伸直的腿向上抬。',
     desc:'侧躺，下面那条腿伸直，上面那条腿屈膝跨到身体前方着地。把下面伸直的腿向上抬起，感受大腿内侧发力，再缓慢放下。做完一侧换边。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><circle cx="120" cy="56" r="7"/><line x1="114" y1="60" x2="74" y2="70"/><line x1="74" y1="70" x2="44" y2="76"/><line x1="74" y1="70" x2="64" y2="84"/><line x1="64" y1="84" x2="84" y2="84"/></svg>` },
@@ -252,10 +266,22 @@ const BASE = [
     cue:'脚掌相对，膝盖向两侧自然下沉。',
     desc:'仰卧，双脚脚掌相对、膝盖向两侧打开成蝴蝶状，让膝盖在重力下自然下沉，放松髋部和大腿内侧。每次保持 20–30 秒，配合深呼吸。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><circle cx="26" cy="76" r="7"/><line x1="33" y1="78" x2="92" y2="76"/><line x1="92" y1="76" x2="74" y2="58"/><line x1="74" y1="58" x2="86" y2="44"/><line x1="92" y1="76" x2="110" y2="58"/><line x1="110" y1="58" x2="98" y2="44"/><line x1="86" y1="44" x2="98" y2="44"/></svg>` },
-  { id:'catcamel', name:'Cat Camel（猫驼式 / 猫牛式）', sets:2, reps:10, type:'reps', repSecs:4,
+  { id:'catcamel', name:'Cat Camel（猫驼式 / 猫牛式）', sets:2, reps:10, type:'reps', repSecs:5,
     cue:'吸气塌腰抬头，呼气拱背低头。',
     desc:'四点跪姿。吸气时塌腰、抬头、臀部上翘（牛式）；呼气时拱背、低头、收腹（猫式）。一拱一塌算一次，动作缓慢跟着呼吸走。',
     img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><path d="M58 52 q26 -22 50 0"/><circle cx="116" cy="50" r="7"/><line x1="58" y1="52" x2="56" y2="84"/><line x1="108" y1="52" x2="110" y2="84"/></svg>` },
+  { id:'monsterwalks', name:'Monster Walks（怪兽步）', sets:2, reps:10, type:'reps', repSecs:3,
+    cue:'弹力带套膝盖上方，半蹲向前外侧迈步，保持张力。',
+    desc:'把弹力带套在大腿或膝盖上方，双脚与肩同宽、微微下蹲。保持膝盖外撑、带子始终有张力，向前方斜外侧交替迈步，像怪兽走路。左右各算一步。',
+    img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="92" x2="152" y2="92"/><circle cx="80" cy="20" r="8"/><line x1="80" y1="28" x2="80" y2="52"/><line x1="80" y1="34" x2="62" y2="46"/><line x1="80" y1="34" x2="98" y2="46"/><line x1="80" y1="52" x2="64" y2="72"/><line x1="64" y1="72" x2="60" y2="92"/><line x1="80" y1="52" x2="100" y2="70"/><line x1="100" y1="70" x2="110" y2="92"/><line x1="66" y1="64" x2="98" y2="64"/></svg>` },
+  { id:'bandwalks', name:'Band Walks（弹力带横向走）', sets:2, reps:10, type:'reps', repSecs:3,
+    cue:'弹力带套腿上，半蹲向侧方迈步，膝盖外撑别内扣。',
+    desc:'弹力带套在大腿或脚踝上方，保持半蹲姿势。维持带子张力，向一侧横向迈一步、另一只脚跟上，膝盖始终外撑不要内扣。走几步后再朝另一个方向走回来。',
+    img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="92" x2="152" y2="92"/><circle cx="80" cy="20" r="8"/><line x1="80" y1="28" x2="80" y2="52"/><line x1="80" y1="34" x2="62" y2="48"/><line x1="80" y1="34" x2="98" y2="48"/><line x1="80" y1="52" x2="54" y2="74"/><line x1="54" y1="74" x2="50" y2="92"/><line x1="80" y1="52" x2="106" y2="74"/><line x1="106" y1="74" x2="110" y2="92"/><line x1="54" y1="86" x2="106" y2="86"/></svg>` },
+  { id:'marches', name:'Core Advanced Marches（核心进阶行进）', sets:2, reps:10, type:'reps', repSecs:4,
+    cue:'仰卧屈髋屈膝成桌面位，下背贴地，交替把脚慢慢放低点地再收回。',
+    desc:'仰卧，屈髋屈膝让大腿垂直、小腿与地面平行（桌面位）。全程下背贴紧地面、收紧核心，慢慢把一只脚向下放低、脚尖轻点地面再收回，左右交替，像缓慢行进。左右各算一次，动作要稳、别让腰拱起来。',
+    img:`<svg class="pose" viewBox="0 0 160 100"><line class="floor" x1="8" y1="84" x2="152" y2="84"/><circle cx="28" cy="76" r="7"/><line x1="35" y1="78" x2="86" y2="76"/><line x1="86" y1="76" x2="88" y2="52"/><line x1="88" y1="52" x2="112" y2="52"/><line x1="86" y1="76" x2="98" y2="62"/><line x1="98" y1="62" x2="104" y2="82"/></svg>` },
 ];
 
 const PLAN_KEY='ptPlan', STORE='ptDaily', HIST_KEY='ptHistory';
@@ -274,22 +300,23 @@ function planList(){
   BASE.forEach(b=>{ if(!ids.includes(b.id)) ids.push(b.id); });
   plan.order=ids;
   return ids.map(id=>{ const b=baseById(id), c=plan.custom[id]||{};
-    return {...b, sets:c.sets??b.sets, reps:c.reps??b.reps}; });
+    return {...b, sets:c.sets??b.sets, reps:c.reps??b.reps, on:c.on!==false}; });
 }
+function activeList(){ return planList().filter(e=>e.on!==false); }
 const REST=12;
 function estSeconds(ex){
   if(ex.type==='hold') return ex.sets*ex.reps*(ex.holdSecs||25)+ex.reps*4+6;
   return ex.sets*ex.reps*(ex.repSecs||3)+Math.max(0,ex.sets-1)*REST+8;
 }
 function fmtMin(sec){ const m=Math.max(1,Math.round(sec/60)); return `约 ${m} 分钟`; }
-function totalEst(){ return planList().reduce((a,e)=>a+estSeconds(e),0); }
+function totalEst(){ return activeList().reduce((a,e)=>a+estSeconds(e),0); }
 
 function load(){ try{ const r=JSON.parse(localStorage.getItem(STORE)||'{}'); if(r.date===todayKey) return r.done||{}; }catch(e){} return {}; }
 let doneState=load();
 function loadHist(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'{}'); }catch(e){ return {}; } }
 let history=loadHist();
 function recordHistory(){
-  const list=planList(), total=list.length, done=list.filter(e=>doneState[e.id]).length;
+  const list=activeList(), total=list.length, done=list.filter(e=>doneState[e.id]).length;
   if(done>0) history[todayKey]={done,total}; else delete history[todayKey];
   localStorage.setItem(HIST_KEY,JSON.stringify(history));
 }
@@ -309,7 +336,10 @@ const SEARCH={
   clamshells:'clamshell exercise glute',
   hipadduction:'side lying hip adduction exercise',
   butterfly:'supine butterfly stretch',
-  catcamel:'cat camel exercise'
+  catcamel:'cat camel exercise',
+  monsterwalks:'monster walk exercise resistance band',
+  bandwalks:'lateral band walk exercise',
+  marches:'dead bug march core exercise'
 };
 function mediaBtns(ex){
   const q=encodeURIComponent(SEARCH[ex.id]||ex.name);
@@ -322,7 +352,7 @@ function mediaBtns(ex){
 /* ---------- 今天 ---------- */
 const list=document.getElementById('list');
 function renderToday(){
-  const items=planList();
+  const items=activeList();
   list.innerHTML='';
   items.forEach(ex=>{
     const card=document.createElement('div');
@@ -401,7 +431,7 @@ function renderToday(){
   updateProgress();
 }
 function updateProgress(){
-  const items=planList(), total=items.length, done=items.filter(e=>doneState[e.id]).length;
+  const items=activeList(), total=items.length, done=items.filter(e=>doneState[e.id]).length;
   document.getElementById('pcount').textContent=`${done} / ${total}`;
   document.getElementById('pfill').style.width=total?(done/total*100)+'%':'0%';
   document.getElementById('alldone').style.display=(total&&done===total)?'block':'none';
@@ -419,14 +449,17 @@ function renderPlan(){
   planListEl.innerHTML='';
   items.forEach((ex,idx)=>{
     const row=document.createElement('div');
-    row.className='plan-row';
+    row.className='plan-row'+(ex.on===false?' off':'');
+    row.dataset.id=ex.id;
     row.innerHTML=`
       <div class="plan-top">
+        <div class="pdrag" title="拖动排序"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></div>
         <div class="mv">
           <button data-mv="up" ${idx===0?'disabled':''}>▲</button>
           <button data-mv="down" ${idx===items.length-1?'disabled':''}>▼</button>
         </div>
         <div class="plan-name">${ex.name}<div class="plan-type">${ex.type==='reps'?'重复动作':'保持/拉伸'} · ≈${fmtMin(estSeconds(ex))}</div></div>
+        <button class="ptoggle ${ex.on===false?'':'on'}" data-tg>${ex.on===false?'已跳过':'✓ 在练'}</button>
       </div>
       <div class="plan-edit">
         <div class="pe-group"><span class="lbl">组数</span>
@@ -439,6 +472,7 @@ function renderPlan(){
     const cur=()=>plan.custom[ex.id]||(plan.custom[ex.id]={});
     row.querySelector('[data-mv="up"]').addEventListener('click',()=>moveItem(ex.id,-1));
     row.querySelector('[data-mv="down"]').addEventListener('click',()=>moveItem(ex.id,1));
+    row.querySelector('[data-tg]').addEventListener('click',()=>{ const c=cur(); c.on=(ex.on===false); savePlan(); renderPlan(); });
     const sv=row.querySelector('.sv'), rv=row.querySelector('.rv'), et=row.querySelector('.plan-type');
     const refresh=()=>{ const c=plan.custom[ex.id]||{}; const eff={...ex,sets:c.sets??ex.sets,reps:c.reps??ex.reps};
       et.textContent=(ex.type==='reps'?'重复动作':'保持/拉伸')+' · ≈'+fmtMin(estSeconds(eff));
@@ -455,6 +489,13 @@ function moveItem(id,dir){
   if(j<0||j>=ids.length) return;
   [ids[i],ids[j]]=[ids[j],ids[i]];
   plan.order=ids; savePlan(); renderPlan();
+}
+let planSortable=null;
+function initPlanSort(){
+  if(planSortable||typeof Sortable==='undefined') return;
+  planSortable=new Sortable(planListEl,{ handle:'.pdrag', animation:160, delay:120, delayOnTouchOnly:true,
+    onEnd:()=>{ const ids=[...planListEl.children].map(c=>c.dataset.id).filter(Boolean);
+      if(ids.length){ plan.order=ids; savePlan(); renderPlan(); } } });
 }
 document.getElementById('planReset').addEventListener('click',()=>{
   if(confirm('恢复成默认的练习顺序和组数次数？（不影响打卡记录）')){
@@ -514,7 +555,7 @@ function show(v){
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.getElementById('vtitle').textContent=titles[v];
   if(v==='today') renderToday();
-  if(v==='plan') renderPlan();
+  if(v==='plan'){ renderPlan(); initPlanSort(); }
   if(v==='progress') renderProgress();
 }
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.view)));
@@ -531,10 +572,13 @@ function pickVoice(){
   try{
     const vs=speechSynthesis.getVoices()||[];
     const zh=vs.filter(v=>/^zh|cmn|chinese/i.test(v.lang)||/普通话|中文|国语/.test(v.name));
-    const score=v=>{ let s=0; const n=(v.name||'').toLowerCase();
-      if(n.includes('google')) s+=6;
-      if(/enhanced|premium|natural|siri|neural/i.test(v.name)) s+=5;
-      if(/ting|mei|yu|sin|li/i.test(n)) s+=2;
+    const female=/tingting|ting-ting|mei-?jia|sin-?ji|hui-?hui|xiaoxiao|xiaoyi|yaoyao|female|婷婷|小美|美佳|晓|女声|女/i;
+    const male=/yu-?shu|kang-?kang|yunyang|yunxi|male|云|男声|男/i;
+    const score=v=>{ let s=0; const nm=v.name||'', n=nm.toLowerCase();
+      if(n.includes('google')) s+=5;
+      if(/enhanced|premium|natural|siri|neural/i.test(nm)) s+=4;
+      if(female.test(nm)) s+=8;
+      if(male.test(nm)) s-=8;
       if(/compact|eloquence/i.test(n)) s-=4;
       if((v.lang||'').toLowerCase()==='zh-cn') s+=1; return s; };
     zh.sort((a,b)=>score(b)-score(a));
@@ -545,7 +589,7 @@ if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pi
 function speak(text){
   return new Promise(res=>{
     if(!('speechSynthesis' in window)){ setTimeout(res,350); return; }
-    try{ const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=0.95; u.pitch=1.02;
+    try{ const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=0.95; u.pitch=1.06;
       if(chosenVoice) u.voice=chosenVoice; u.onend=res; u.onerror=res; speechSynthesis.speak(u); }
     catch(e){ res(); }
   });
@@ -556,14 +600,23 @@ function wait(ms){
       if(guide.paused) return; el+=step; if(el>=ms){ clearInterval(iv); res(); } },step);
   });
 }
+function pace(ms){
+  const f=document.getElementById('gPaceFill'); if(!f) return;
+  f.style.transition='none'; f.style.width='0%'; void f.offsetWidth;
+  f.style.transition='width '+ms+'ms linear'; f.style.width='100%';
+}
 async function runGuide(){
   guide.running=true; guide.cancel=false; guide.paused=false; gPause.textContent='暂停';
   overlay.classList.add('show');
-  const seq=planList();
+  const seq=activeList();
+  const totalUnits=Math.max(1,seq.reduce((a,e)=>a+e.sets*e.reps,0));
+  let doneUnits=0;
+  const setProg=()=>{ const f=document.getElementById('gProgFill'); if(f) f.style.width=(doneUnits/totalUnits*100)+'%'; };
+  setProg();
   await speak('开始今天的康复练习，跟我一起做');
   for(let i=0;i<seq.length;i++){
     if(guide.cancel) break;
-    guide.skip=false; const ex=seq[i];
+    guide.skip=false; const ex=seq[i]; const baseUnits=doneUnits;
     gStep.textContent=`第 ${i+1} / ${seq.length} 个`;
     gName.textContent=ex.name; gSub.textContent=`${ex.sets} 组 × ${ex.reps} ${ex.type==='reps'?'次':'次保持'}`;
     gPose.innerHTML=ex.img; gCount.textContent=''; gSet.textContent='';
@@ -574,20 +627,24 @@ async function runGuide(){
       if(ex.sets>1&&!guide.skip&&!guide.cancel) await speak(`第${s}组`);
       for(let r=1;r<=ex.reps&&!guide.cancel&&!guide.skip;r++){
         if(ex.type==='hold'){
-          gCount.textContent='保持'; await speak(`第${r}次，保持`);
-          let left=ex.holdSecs||25;
+          const hold=ex.holdSecs||25;
+          gCount.textContent='保持'; pace(hold*1000); await speak(`第${r}次，保持`);
+          let left=hold;
           while(left>0&&!guide.cancel&&!guide.skip){ gCount.textContent=left; await wait(1000); left--; }
           if(!guide.skip&&!guide.cancel){ gCount.textContent='放松'; await speak('放松'); }
         } else {
-          gCount.textContent=r; await speak(String(r));
-          await wait(Math.max(400,(ex.repSecs||3)*1000-700));
+          const iv=(ex.repSecs||4)*1000;
+          gCount.textContent=r; pace(iv); await speak(String(r));
+          await wait(Math.max(400,iv-700));
         }
+        doneUnits=baseUnits+(s-1)*ex.reps+r; setProg();
       }
       if(s<ex.sets&&!guide.cancel&&!guide.skip){ gCount.textContent='休息'; await speak('休息一下'); await wait(12000); }
     }
+    doneUnits=baseUnits+ex.sets*ex.reps; setProg();
     if(!guide.cancel){ doneState[ex.id]=true; save(); await speak('很好，完成'); }
   }
-  if(!guide.cancel) await speak('全部练习完成，太棒了！');
+  if(!guide.cancel){ const f=document.getElementById('gProgFill'); if(f) f.style.width='100%'; await speak('全部练习完成，太棒了！'); }
   endGuide();
 }
 function endGuide(){
